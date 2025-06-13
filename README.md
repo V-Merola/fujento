@@ -1,0 +1,2 @@
+# fujento
+Spring Modulith Application 
