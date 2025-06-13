@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: fujento
+user:
+  max-preferred-sports: 3
+  max-bio-length: 300
