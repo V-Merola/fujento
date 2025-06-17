@@ -1,15 +1,23 @@
 package com.fujentopj.fujento.module.users.domain.model.aggregate;
 
 
+import com.fujentopj.fujento.module.users.domain.event.*;
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
 import com.fujentopj.fujento.module.users.domain.model.enums.UserStatus;
 import com.fujentopj.fujento.module.users.domain.model.exception.InvalidUserStateException;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.*;
+import com.fujentopj.fujento.module.users.domain.service.UserValidator;
+import com.fujentopj.fujento.module.users.domain.service.RoleAssignmentPolicy;
+import com.fujentopj.fujento.module.users.domain.service.rule.CannotBanAdminRule;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
+
 
 /**
  * Aggregate Root che rappresenta un utente nel sistema.
@@ -23,101 +31,264 @@ import java.util.Set;
  */
 
 public class User {
-    private final UserId id; //Value Object immutabile
-    private Email email; 	// Validato da UserValidator
-    private HashedPassword password; //hashed, validato
+
+    private final UserId id;
+    private Email email;
+    private HashedPassword password;
     private Nickname nickname;
-    private String bio; //opzionale
-    private String imageUrl; //opzionale
-    private Set<Role> roles = new HashSet<>();
+    private Role role;
     private UserStatus status;
-    private Set<SportPreference> sportPreferences = new HashSet<>();
 
-    /**
-     * Costruttore protetto, usato solo internamente o dai factory method
-     */
-    protected User(UserId id, Email email, HashedPassword password, Nickname nickname){
+    private long version; //gestito da Hibernate (@Version) nel layer persistence
+
+    private final List<DomainEvent> domainEvents = new ArrayList<>();
+
+    private boolean dirty = false;
+
+    // ============================
+    // Factory Method
+    // ============================
+    public static User register(
+            UserId id,
+            Email email,
+            HashedPassword password,
+            Nickname nickname,
+            Role role,
+            UserValidator validator
+    ) {
+        validator.validateEmail(email);
+        validator.validateNickname(nickname);
+        validator.validateRoleAssignment(null, role);
+
+        User user = new User(id, email, password, nickname, role, UserStatus.ACTIVE);
+        //user.registerEvent(new UserRegistered(id.value(), email.value(), nickname.value(), Instant.now()));
+        user.registerEvent(new UserRegistered(
+                id,
+                email,
+                nickname,
+                Instant.now()
+        ));
+        return user;
+    }
+
+    // ============================
+    // Costruttori (ORM-friendly)
+    // ============================
+    protected User(
+            UserId id,
+            Email email,
+            HashedPassword password,
+            Nickname nickname,
+            Role role,
+            UserStatus status
+    ) {
         this.id = Objects.requireNonNull(id);
-        this.email = Objects.requireNonNull(email, "Email cannot be null or empty");
-        this.password = Objects.requireNonNull(password, "Hashed Password obbligatoria");
-        this.nickname = Objects.requireNonNull(nickname, "Nickname obbligatorio");
-        this.status = UserStatus.ACTIVE;
-        this.roles.add(Role.PLAYER); // ruolo di default
+        this.email = Objects.requireNonNull(email);
+        this.password = Objects.requireNonNull(password);
+        this.nickname = Objects.requireNonNull(nickname);
+        this.role = Objects.requireNonNull(role);
+        this.status = Objects.requireNonNull(status);
     }
 
-    /**
-     * Factory method per creare un nuovo utente a partire da dati minimi
-     */
-    public static User register(Email email, HashedPassword hashedPassword, Nickname nickname) {
-        return new User(UserId.create(), email, hashedPassword, nickname);
+    protected User() {
+        this.id = null; // Per ORM
     }
 
-    private String requireNonEmpty(String value, String message) {
-        if (value == null || value.isBlank()) throw new IllegalArgumentException(message);
-        return value.trim();
-    }
+    // ============================
+    // Comportamenti di dominio
+    // ============================
 
-    /**
-     * Altri metodi di comportamento per gestire l'utente
-     */
-    public void updateProfile(Nickname newNickname, String bio, String imageUrl, Set<SportPreference> sportPreferences){
-        if(newNickname != null) {
-            changeNickname(newNickname);
+    public void changeEmail(Email newEmail, UserValidator validator) {
+        validator.validateEmail(newEmail);
+
+        /*
+        if (!this.email.equals(newEmail)) {
+            this.email = newEmail;
+            //registerEvent(new UserEmailChanged(id.value(), newEmail.value()));
+            registerEvent( new UserEmailChanged(
+                    id,
+                    newEmail,
+                    Instant.now()
+            ));
         }
-        this.bio = (bio != null && !bio.isBlank()) ? bio.trim() : null;
+         */
+        registerEventIfChanged(!this.email.equals(newEmail),
+                new UserEmailChanged(
+                        id,
+                        newEmail,
+                        Instant.now()
+                )
+        );
+    }
 
-        this.imageUrl = (imageUrl != null && !imageUrl.isBlank()) ? imageUrl.trim() : null;
+    public void changeNickname(Nickname newNickname, UserValidator validator) {
+        validator.validateNickname(newNickname);
+        /*
+        if (!this.nickname.equals(newNickname)) {
+            this.nickname = newNickname;
+            //registerEvent(new UserNicknameChanged(id.value(), newNickname.value()));
+            registerEvent(new UserNicknameChanged(
+                    id,
+                    newNickname,
+                    Instant.now()
+            ));
+        }
 
-        if(sportPreferences != null){
-            this.sportPreferences = Set.copyOf(sportPreferences);
+         */
+        registerEventIfChanged( !this.nickname.equals(newNickname),
+                new UserNicknameChanged(
+                        id,
+                        newNickname,
+                        Instant.now()
+                )
+        );
+    }
+
+    public void changePassword(HashedPassword newPassword) throws InvalidUserStateException {
+        Objects.requireNonNull(newPassword, "Password non può essere null");
+
+        if (this.status == UserStatus.BANNED || this.status == UserStatus.DISABLED) {
+            throw new InvalidUserStateException("Utente bannato o disattivato: non può cambiare password.");
+        }
+
+        this.password = newPassword;
+        //registerEvent(new UserPasswordChanged(id.value())); // opzionale: non includere hash
+        registerEvent(new UserPasswordChanged(
+                id,
+                Instant.now()
+        )
+        );
+
+    }
+
+    private void  changeStatusTo(UserStatus newStatus, DomainEvent event){
+        /*
+        if(this.status != newStatus) {
+            this.status = newStatus;
+            registerEvent(event);
+        }
+         */
+        registerEventIfChanged( !this.status.equals(newStatus),
+                event
+        );
+    }
+
+
+
+    //POTREBBE ESSERE SPLITTATO IN promoteTo e demoteTo PER CHIAREZZA SEMANTICA
+    public void requestRoleChange(Role newRole, RoleAssignmentPolicy policy) throws InvalidUserStateException {
+        if (!policy.canAssign(this.role, newRole)) {
+            throw new InvalidUserStateException("Cambio ruolo non consentito: " + newRole);
+        }
+
+        if (!this.role.equals(newRole)) {
+            this.role = newRole;
+            registerEvent(new UserRoleChanged(
+                    id,
+                    newRole,
+                    null,
+                    Instant.now()
+            ));
         }
     }
 
-    public void assignRole(Role role) {
-        if (role == null) throw new IllegalArgumentException("Role cannot be null");
-        this.roles.add(role);
+//    public void activate() {
+//        if (this.status == UserStatus.BANNED) {
+//            throw new InvalidUserStateException("Impossibile attivare un utente bannato.");
+//        }
+//
+//        if (this.status != UserStatus.ACTIVE) {
+//            this.status = UserStatus.ACTIVE;
+//            //registerEvent(new UserActivated(id.value()));
+//            registerEvent(new UserActivated(
+//                    id,
+//                    Instant.now()
+//            ));
+//        }
+//    }
+    // VERIFICARE SE IN CHANGE STATUS VIENE PASSATO CORRETTAMENTE L'EVENTO
+    public void activate() throws InvalidUserStateException {
+        if(this.status == UserStatus.BANNED){
+            throw new InvalidUserStateException("Impossibile attivare un utente bannato.");
+        }
+        changeStatusTo(UserStatus.ACTIVE, new UserActivated(id, Instant.now()));
+
     }
 
-    public void removeRole(Role role) {
-        if (role != null && !role.equals(Role.PLAYER)) { // non rimuovere il ruolo PLAYER
-            this.roles.remove(role);
+//    public void deactivate() {
+//        if (this.status == UserStatus.BANNED) {
+//            throw new InvalidUserStateException("Impossibile disattivare un utente bannato.");
+//        }
+//
+//        if (this.status != UserStatus.DISABLED) {
+//            this.status = UserStatus.DISABLED;
+//            //registerEvent(new UserDeactivated(id.value()));
+//            registerEvent( new UserDeactivated(
+//                    id,
+//                    Instant.now()
+//            ));
+//        }
+//    }
+
+    public void deactivate() throws InvalidUserStateException {
+        if(this.status == UserStatus.BANNED){
+            throw new InvalidUserStateException("Impossibile disattivare un utente bannato.");
+        }
+        changeStatusTo(UserStatus.DISABLED, new UserDeactivated(id, Instant.now()));
+    }
+
+//    public void ban() {
+//        if (this.status != UserStatus.BANNED) {
+//            this.status = UserStatus.BANNED;
+//           // registerEvent(new UserBanned(id.value()));
+//            registerEvent(new UserBanned(
+//                    id,
+//                    Instant.now()
+//            ));
+//        }
+//    }
+
+    public void ban() throws InvalidUserStateException {
+        var rule = new CannotBanAdminRule(this);
+        if(!rule.isSatisfied()) {
+            throw new InvalidUserStateException(rule.message());
+        }
+
+        changeStatusTo(UserStatus.BANNED, new UserBanned(id, Instant.now()));
+    }
+
+
+    // ============================
+    // Event handling
+    // ============================
+
+    private void registerEvent(DomainEvent event) {
+        this.domainEvents.add(event);
+        this.dirty = true;
+    }
+
+    public List<DomainEvent> getDomainEvents() {
+        return Collections.unmodifiableList(domainEvents);
+    }
+
+    public boolean isDirty() {
+        return dirty;
+    }
+
+    public void clearDomainEvents() {
+        this.domainEvents.clear();
+        this.dirty = false;
+    }
+
+    private void registerEventIfChanged(boolean changed, DomainEvent event) {
+        if (changed) {
+            registerEvent(event);
         }
     }
 
-    public void changeStatus(UserStatus newStatus) {
-        if (newStatus == null) throw new IllegalArgumentException("UserStatus cannot be null");
-        this.status = newStatus;
-    }
-
-    /**
-     * Cambia la password utente.
-     * La password fornita deve essere già hashata.
-     */
-    public void changePassword(HashedPassword newHashedPassword) throws InvalidUserStateException {
-        if (this.status != UserStatus.ACTIVE) {
-            throw new InvalidUserStateException("Solo utenti attivi possono cambiare password");
-        }
-        this.password = Objects.requireNonNull(newHashedPassword, "Hashed Password required");
-    }
-
-    /**
-     * Cambia l'email associata all'utente.
-     * Si assume che l’unicità e validità siano già verificate a monte.
-     */
-    public void changeEmail(Email newEmail) {
-        this.email = Objects.requireNonNull(newEmail, "Email cannot be null or empty");
-    }
-
-    /**
-     * Cambia il nickname dell'utente.
-     * Si assume che l'unicità e validità siano già verificate a monte.
-     */
-    public void changeNickname(Nickname newNickname) {
-        this.nickname = Objects.requireNonNull(newNickname, "Nickname cannot be null");
-    }
-
-
-    // === GETTER ===
+    // ============================
+    // Getters
+    // ============================
 
     public UserId getId() {
         return id;
@@ -131,27 +302,27 @@ public class User {
         return nickname;
     }
 
-    public HashedPassword getPassword() {
-        return password;
-    }
-
-    public String getBio() {
-        return bio;
-    }
-
-    public String getImageUrl() {
-        return imageUrl;
-    }
-
-    public Set<Role> getRoles() {
-        return Collections.unmodifiableSet(roles);
+    public Role getRole() {
+        return role;
     }
 
     public UserStatus getStatus() {
         return status;
     }
 
-    public Set<SportPreference> getSportPreferences() {
-        return Collections.unmodifiableSet(sportPreferences);
+    // ============================
+    // Equals & HashCode
+    // ============================
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof User other)) return false;
+        return Objects.equals(id, other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 }

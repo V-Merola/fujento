@@ -1,18 +1,25 @@
 package com.fujentopj.fujento.module.users.domain.model.valueObject;
 
+import com.fujentopj.fujento.module.users.domain.model.common.Identifier;
+
 import java.util.Objects;
 import java.util.UUID;
 
-public final class UserId {
-    private final UUID value;
+public record UserId(UUID value) implements Identifier {
+    //private final UUID value;
     
-    private UserId(UUID value){
-        this.value = Objects.requireNonNull(value, "UserId value cannot be null");
+    //private UserId(UUID value){
+    //    this.value = Objects.requireNonNull(value, "UserId value cannot be null");
+    //}
+
+    public UserId {
+        Objects.requireNonNull(value, "UserId non può essere null");
     }
 
     /*
      * Crea un nuovo ID utente con un UUID random.
      */
+
     public static UserId create() {
         return new UserId(UUID.randomUUID());
     }
@@ -42,7 +49,7 @@ public final class UserId {
 
     @Override
     public boolean equals(Object o) {
-        return this == o || (o instanceof UserId other && value.equals(other.value));
+        return this == o || (o instanceof UserId(UUID value1) && value.equals(value1));
     }
 
     @Override
