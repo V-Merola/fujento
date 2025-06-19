@@ -2,7 +2,6 @@ package com.fujentopj.fujento.module.users.application.dto.request;
 
 
 import com.fujentopj.fujento.module.users.domain.model.valueObject.Nickname;
-import com.fujentopj.fujento.module.users.domain.model.valueObject.SportPreference;
 
 import java.util.Set;
 

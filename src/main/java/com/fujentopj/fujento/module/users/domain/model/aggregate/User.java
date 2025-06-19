@@ -13,7 +13,7 @@ import com.fujentopj.fujento.module.users.domain.service.rule.CannotBanAdminRule
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.function.Consumer;
 
 import java.util.Collections;
 import java.util.Objects;
@@ -101,41 +101,26 @@ public class User {
     public void changeEmail(Email newEmail, UserValidator validator) {
         validator.validateEmail(newEmail);
 
-        /*
-        if (!this.email.equals(newEmail)) {
-            this.email = newEmail;
-            //registerEvent(new UserEmailChanged(id.value(), newEmail.value()));
-            registerEvent( new UserEmailChanged(
-                    id,
-                    newEmail,
-                    Instant.now()
-            ));
-        }
-         */
-        registerEventIfChanged(!this.email.equals(newEmail),
+        mutateIfChanged(
+                this.email,
+                newEmail,
+                (e) -> this.email = e,
                 new UserEmailChanged(
                         id,
                         newEmail,
                         Instant.now()
                 )
         );
+        
     }
 
     public void changeNickname(Nickname newNickname, UserValidator validator) {
         validator.validateNickname(newNickname);
-        /*
-        if (!this.nickname.equals(newNickname)) {
-            this.nickname = newNickname;
-            //registerEvent(new UserNicknameChanged(id.value(), newNickname.value()));
-            registerEvent(new UserNicknameChanged(
-                    id,
-                    newNickname,
-                    Instant.now()
-            ));
-        }
 
-         */
-        registerEventIfChanged( !this.nickname.equals(newNickname),
+        mutateIfChanged(
+                this.nickname,
+                newNickname,
+                (n) -> this.nickname = n,
                 new UserNicknameChanged(
                         id,
                         newNickname,
@@ -151,24 +136,28 @@ public class User {
             throw new InvalidUserStateException("Utente bannato o disattivato: non può cambiare password.");
         }
 
-        this.password = newPassword;
-        //registerEvent(new UserPasswordChanged(id.value())); // opzionale: non includere hash
-        registerEvent(new UserPasswordChanged(
-                id,
-                Instant.now()
-        )
+        mutateIfChanged(
+                this.password,
+                newPassword,
+                (hp) -> this.password = hp,
+                new UserPasswordChanged(
+                        id,
+                        Instant.now()
+                )
         );
-
     }
 
-    private void  changeStatusTo(UserStatus newStatus, DomainEvent event){
-        /*
-        if(this.status != newStatus) {
-            this.status = newStatus;
-            registerEvent(event);
+    private void  changeStatusTo(UserStatus newStatus, DomainEvent event) throws InvalidUserStateException {
+        
+        Objects.requireNonNull(newStatus, "Nuovo stato non può essere null");
+        if (this.status == UserStatus.BANNED && newStatus != UserStatus.BANNED) {
+            throw new InvalidUserStateException("Impossibile cambiare stato da BANNED a " + newStatus);
         }
-         */
-        registerEventIfChanged( !this.status.equals(newStatus),
+
+        mutateIfChanged(
+                this.status,
+                newStatus,
+                (s) -> this.status = s,
                 event
         );
     }
@@ -176,37 +165,25 @@ public class User {
 
 
     //POTREBBE ESSERE SPLITTATO IN promoteTo e demoteTo PER CHIAREZZA SEMANTICA
-    public void requestRoleChange(Role newRole, RoleAssignmentPolicy policy) throws InvalidUserStateException {
+    public void changeRoleTo(Role newRole, RoleAssignmentPolicy policy) throws InvalidUserStateException {
         if (!policy.canAssign(this.role, newRole)) {
             throw new InvalidUserStateException("Cambio ruolo non consentito: " + newRole);
         }
 
-        if (!this.role.equals(newRole)) {
-            this.role = newRole;
-            registerEvent(new UserRoleChanged(
-                    id,
-                    newRole,
-                    null,
-                    Instant.now()
-            ));
-        }
+        mutateIfChanged(
+                this.role,
+                newRole,
+                (r) -> this.role = r,
+                new UserRoleChanged(
+                        id,
+                        newRole,
+                        null, // Qui si potrebbe passare l'utente che ha fatto la modifica
+                        Instant.now()
+                )
+        );
+
     }
 
-//    public void activate() {
-//        if (this.status == UserStatus.BANNED) {
-//            throw new InvalidUserStateException("Impossibile attivare un utente bannato.");
-//        }
-//
-//        if (this.status != UserStatus.ACTIVE) {
-//            this.status = UserStatus.ACTIVE;
-//            //registerEvent(new UserActivated(id.value()));
-//            registerEvent(new UserActivated(
-//                    id,
-//                    Instant.now()
-//            ));
-//        }
-//    }
-    // VERIFICARE SE IN CHANGE STATUS VIENE PASSATO CORRETTAMENTE L'EVENTO
     public void activate() throws InvalidUserStateException {
         if(this.status == UserStatus.BANNED){
             throw new InvalidUserStateException("Impossibile attivare un utente bannato.");
@@ -215,20 +192,6 @@ public class User {
 
     }
 
-//    public void deactivate() {
-//        if (this.status == UserStatus.BANNED) {
-//            throw new InvalidUserStateException("Impossibile disattivare un utente bannato.");
-//        }
-//
-//        if (this.status != UserStatus.DISABLED) {
-//            this.status = UserStatus.DISABLED;
-//            //registerEvent(new UserDeactivated(id.value()));
-//            registerEvent( new UserDeactivated(
-//                    id,
-//                    Instant.now()
-//            ));
-//        }
-//    }
 
     public void deactivate() throws InvalidUserStateException {
         if(this.status == UserStatus.BANNED){
@@ -236,17 +199,7 @@ public class User {
         }
         changeStatusTo(UserStatus.DISABLED, new UserDeactivated(id, Instant.now()));
     }
-
-//    public void ban() {
-//        if (this.status != UserStatus.BANNED) {
-//            this.status = UserStatus.BANNED;
-//           // registerEvent(new UserBanned(id.value()));
-//            registerEvent(new UserBanned(
-//                    id,
-//                    Instant.now()
-//            ));
-//        }
-//    }
+    
 
     public void ban() throws InvalidUserStateException {
         var rule = new CannotBanAdminRule(this);
@@ -280,12 +233,13 @@ public class User {
         this.dirty = false;
     }
 
-    private void registerEventIfChanged(boolean changed, DomainEvent event) {
-        if (changed) {
-            registerEvent(event);
+
+    private <T> void mutateIfChanged(T currentValue, T newValue,Consumer<T> mutation ,DomainEvent event) {
+        if (!Objects.equals(currentValue, newValue)) {
+            mutation.accept(newValue); // Aggiorna il valore solo se è cambiato
+            registerEvent(event);   // Registra l'evento solo se c'è stato un cambiamento
         }
     }
-
     // ============================
     // Getters
     // ============================
