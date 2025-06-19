@@ -2,7 +2,6 @@ package com.fujentopj.fujento.module.users.domain.service.rule;
 
 import com.fujentopj.fujento.module.users.domain.model.aggregate.User;
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
-import com.fujentopj.fujento.module.users.domain.service.BusinessRule;
 
 /**
  * Regola di business che impedisce di bannare un utente con ruolo ADMIN.

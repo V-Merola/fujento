@@ -1,4 +1,4 @@
-package com.fujentopj.fujento.module.users.domain.service;
+package com.fujentopj.fujento.module.users.domain.service.policy;
 
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
 

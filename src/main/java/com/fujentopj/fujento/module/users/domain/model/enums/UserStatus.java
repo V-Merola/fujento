@@ -6,5 +6,10 @@ public enum UserStatus {
     /** Profilo disattivato, ma non cancellato (es da ADMIN o Utente stesso*/
     DISABLED,
     /** Profilo bannato, per violazione del sitema non può più accedere al sistema*/
-    BANNED
+    BANNED,
+
+    INACTIVE,
+    SUSPENDED,
+
+    DELETED; // Profilo cancellato, non può più accedere al sistema
 }

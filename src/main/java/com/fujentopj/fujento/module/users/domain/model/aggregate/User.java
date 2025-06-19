@@ -1,13 +1,16 @@
 package com.fujentopj.fujento.module.users.domain.model.aggregate;
 
 
+import com.fujentopj.fujento.module.users.domain.command.ChangeUserRoleCommand;
+import com.fujentopj.fujento.module.users.domain.command.ChangeUserStatusCommand;
 import com.fujentopj.fujento.module.users.domain.event.*;
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
 import com.fujentopj.fujento.module.users.domain.model.enums.UserStatus;
 import com.fujentopj.fujento.module.users.domain.model.exception.InvalidUserStateException;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.*;
 import com.fujentopj.fujento.module.users.domain.service.UserValidator;
-import com.fujentopj.fujento.module.users.domain.service.RoleAssignmentPolicy;
+import com.fujentopj.fujento.module.users.domain.service.policy.RoleAssignmentPolicy;
+import com.fujentopj.fujento.module.users.domain.service.policy.UserStatusTransitionPolicy;
 import com.fujentopj.fujento.module.users.domain.service.rule.CannotBanAdminRule;
 
 import java.time.Instant;
@@ -146,14 +149,30 @@ public class User {
                 )
         );
     }
-
-    private void  changeStatusTo(UserStatus newStatus, DomainEvent event) throws InvalidUserStateException {
-        
-        Objects.requireNonNull(newStatus, "Nuovo stato non può essere null");
-        if (this.status == UserStatus.BANNED && newStatus != UserStatus.BANNED) {
-            throw new InvalidUserStateException("Impossibile cambiare stato da BANNED a " + newStatus);
+    //POTREBBE ESSERE SPLITTATO IN promoteTo e demoteTo PER CHIAREZZA SEMANTICA
+    public void changeRole(ChangeUserRoleCommand command, RoleAssignmentPolicy policy) throws InvalidUserStateException{
+        if(!policy.canAssign(this.role, command.newRole())) {
+            throw new InvalidUserStateException("Cambio ruolo non consentito: " + command.newRole());
         }
 
+        mutateIfChanged(
+                this.role,
+                command.newRole(),
+                (r) -> this.role = r,
+                new UserRoleChanged(
+                        id,
+                        command.newRole(),
+                        command.modifiedBy(),// Qui si passa l'utente che ha fatto la modifica
+                        command.occurredAt(),
+                        command.reason()
+                )
+        );
+
+    }
+    /*
+    private void  changeStatusTo(UserStatus newStatus, DomainEvent event, UserStatusTransitionPolicy policy) throws InvalidUserStateException {
+        //Objects.requireNonNull(newStatus, "Nuovo stato non può essere null");
+        policy.validate(this.status, newStatus);
         mutateIfChanged(
                 this.status,
                 newStatus,
@@ -161,55 +180,45 @@ public class User {
                 event
         );
     }
+    */
+    public void changeStatus(ChangeUserStatusCommand command, UserStatusTransitionPolicy policy) throws InvalidUserStateException{
+        policy.validate(this.status, command.newStatus());
 
+        DomainEvent event = switch (command.newStatus()) {
+            case ACTIVE -> new UserActivated(id, command.occurredAt(), command.modifiedBy(), command.reason());
+            case DISABLED -> new UserDeactivated(id, command.occurredAt(), command.modifiedBy(), command.reason());
+            case BANNED -> new UserBanned(id, command.occurredAt(), command.modifiedBy(), command.reason());
+            case DELETED -> new UserDeleted(id, command.occurredAt(), command.modifiedBy(), command.reason());
 
-
-    //POTREBBE ESSERE SPLITTATO IN promoteTo e demoteTo PER CHIAREZZA SEMANTICA
-    public void changeRoleTo(Role newRole, RoleAssignmentPolicy policy) throws InvalidUserStateException {
-        if (!policy.canAssign(this.role, newRole)) {
-            throw new InvalidUserStateException("Cambio ruolo non consentito: " + newRole);
-        }
-
-        mutateIfChanged(
-                this.role,
-                newRole,
-                (r) -> this.role = r,
-                new UserRoleChanged(
-                        id,
-                        newRole,
-                        null, // Qui si potrebbe passare l'utente che ha fatto la modifica
-                        Instant.now()
-                )
-        );
+            case INACTIVE, SUSPENDED -> null;
+        };
 
     }
 
-    public void activate() throws InvalidUserStateException {
-        if(this.status == UserStatus.BANNED){
-            throw new InvalidUserStateException("Impossibile attivare un utente bannato.");
-        }
-        changeStatusTo(UserStatus.ACTIVE, new UserActivated(id, Instant.now()));
+    /*
+    public void activate(UserStatusTransitionPolicy policy) throws InvalidUserStateException {
+
+        changeStatusTo(UserStatus.ACTIVE, new UserActivated(id, Instant.now()), policy);
 
     }
 
 
-    public void deactivate() throws InvalidUserStateException {
+    public void deactivate(UserStatusTransitionPolicy policy) throws InvalidUserStateException {
         if(this.status == UserStatus.BANNED){
             throw new InvalidUserStateException("Impossibile disattivare un utente bannato.");
         }
-        changeStatusTo(UserStatus.DISABLED, new UserDeactivated(id, Instant.now()));
+        changeStatusTo(UserStatus.DISABLED, new UserDeactivated(id, Instant.now()),policy);
     }
-    
 
-    public void ban() throws InvalidUserStateException {
+
+    public void ban(UserStatusTransitionPolicy policy) throws InvalidUserStateException {
         var rule = new CannotBanAdminRule(this);
         if(!rule.isSatisfied()) {
             throw new InvalidUserStateException(rule.message());
         }
-
-        changeStatusTo(UserStatus.BANNED, new UserBanned(id, Instant.now()));
+        changeStatusTo(UserStatus.BANNED, new UserBanned(id, Instant.now()), policy);
     }
-
+*/
 
     // ============================
     // Event handling

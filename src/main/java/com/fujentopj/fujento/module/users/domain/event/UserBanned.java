@@ -3,10 +3,13 @@ package com.fujentopj.fujento.module.users.domain.event;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;
 
 import java.time.Instant;
+import java.util.Optional;
 
 public record UserBanned(
         UserId userId,
-        Instant occurredAt
+        Instant occurredAt,
+        UserId modifiedBy,
+        Optional<String> reason
 ) implements DomainEvent {
 
     @Override

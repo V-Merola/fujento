@@ -1,4 +1,4 @@
-package com.fujentopj.fujento.module.users.domain.service;
+package com.fujentopj.fujento.module.users.domain.service.rule;
 
 /**
  * Rappresenta una regola di dominio valutabile che può essere utilizzata per verificare

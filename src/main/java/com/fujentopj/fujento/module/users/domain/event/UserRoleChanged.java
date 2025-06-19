@@ -8,8 +8,9 @@ import java.time.Instant;
 public record UserRoleChanged(
         UserId userId,
         Role newRole,
-        String modifiedBy,
-        Instant occurredAt
+        UserId modifiedBy,
+        Instant occurredAt,
+        String reason
 ) implements DomainEvent {
 
     @Override

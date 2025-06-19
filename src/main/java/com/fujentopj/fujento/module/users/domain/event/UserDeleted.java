@@ -5,7 +5,7 @@ import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;
 import java.time.Instant;
 import java.util.Optional;
 
-public record UserDeactivated(
+public record UserDeleted (
         UserId userId,
         Instant occurredAt,
         UserId modifiedBy,
@@ -22,4 +22,6 @@ public record UserDeactivated(
         return occurredAt;
     }
 
+    // Additional methods or logic can be added here if needed
 }
+
