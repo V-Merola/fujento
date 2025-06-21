@@ -3,6 +3,8 @@ package com.fujentopj.fujento.module.users.domain.service.policy;
 import com.fujentopj.fujento.module.users.domain.model.aggregate.User;
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
 import com.fujentopj.fujento.module.users.domain.model.enums.UserStatus;
+import com.fujentopj.fujento.module.users.domain.model.exception.InvalidUserStateException;
+import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;
 
 public class DefaultUserPermissionPolicy implements UserPermissionPolicy{
     private final Role currentUserRole;
@@ -14,8 +16,9 @@ public class DefaultUserPermissionPolicy implements UserPermissionPolicy{
     }
 
     @Override
-    public boolean canChangeEmail() {
-        return currentUserRole == Role.ADMIN || currentUserRole == Role.USER;
+    public boolean canChangeEmail(User target) {
+        //l'utente passato deve essere o l'utente corrente o un admin e non deve essere bannato o disabilitato
+        return (isSelf(target) || currentUserRole == Role.ADMIN) && !isBannedOrDisabled(target);
     }
 
     @Override
@@ -30,7 +33,7 @@ public class DefaultUserPermissionPolicy implements UserPermissionPolicy{
 
     @Override
     public boolean canChangeRole(User target) {
-        return currentUserRole == Role.ADMIN && !isSelf(target);
+        return currentUserRole == Role.ADMIN && !isSelf(target) && !isBannedOrDisabled(target);
     }
 
     @Override
@@ -38,11 +41,13 @@ public class DefaultUserPermissionPolicy implements UserPermissionPolicy{
         return currentUserRole == Role.ADMIN && !isSelf(target);
     }
 
+    // Validazione dello stato dell'utente
     private boolean isSelf(User target) {
         return target.getId().value().toString().equals(currentUserId);
     }
-
+    // Controllo se l'utente è bannato o disabilitato
     private boolean isBannedOrDisabled(User target) {
         return target.getStatus() == UserStatus.BANNED || target.getStatus() == UserStatus.DISABLED;
     }
+
 }

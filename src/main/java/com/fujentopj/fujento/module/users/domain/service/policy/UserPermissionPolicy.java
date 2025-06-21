@@ -6,7 +6,7 @@ import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;
 
 public interface UserPermissionPolicy {
 
-    boolean canChangeEmail();
+
 
     boolean canChangeNickname(User target);
 
@@ -16,4 +16,5 @@ public interface UserPermissionPolicy {
 
     boolean canChangeStatus(User target);
 
+    boolean canChangeEmail(User target);
 }

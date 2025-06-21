@@ -1,4 +1,4 @@
-package com.fujentopj.fujento.module.users.domain.command;
+package com.fujentopj.fujento.module.users.application.command;
 
 import com.fujentopj.fujento.module.users.domain.model.valueObject.Email;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;

@@ -16,6 +16,12 @@ public record UserRegistered(
         Instant occurredAt
 
 ) implements DomainEvent{
+    public static UserRegistered of(UserSnapshot snapshot) {
+        return new UserRegistered(
+                snapshot,
+                Instant.now()
+        );
+    }
     @Override
     public UserId aggregateId() {
         return snapshot.id();

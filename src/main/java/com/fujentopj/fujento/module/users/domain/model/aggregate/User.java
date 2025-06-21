@@ -1,9 +1,6 @@
 package com.fujentopj.fujento.module.users.domain.model.aggregate;
 
 
-import com.fujentopj.fujento.module.users.domain.command.ChangeUserEmailCommand;
-import com.fujentopj.fujento.module.users.domain.command.ChangeUserRoleCommand;
-import com.fujentopj.fujento.module.users.domain.command.ChangeUserStatusCommand;
 import com.fujentopj.fujento.module.users.domain.event.*;
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
 import com.fujentopj.fujento.module.users.domain.model.enums.UserStatus;
@@ -23,6 +20,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.function.Consumer;
 
+//sarebbe opportuno eliminare per non avere dipendenze esterne?
 import static com.fujentopj.fujento.module.users.domain.support.DomainEventLogger.logTransition;
 
 
@@ -53,6 +51,7 @@ public class User {
     private boolean dirty = false;
 
     private static final Logger log = LoggerFactory.getLogger(User.class);
+
     // ============================
     // Factory Method
     // ============================
@@ -101,6 +100,7 @@ public class User {
     /**
      * Costruttore protetto per ORM (es. Hibernate).
      * Non dovrebbe essere usato direttamente, ma solo da framework di persistenza.
+     *
      * @deprecated Per favore usa il factory method {@link #register(UserId, Email, HashedPassword, Nickname, Role, UserValidator)}
      */
     @Deprecated(forRemoval = false)
@@ -112,31 +112,58 @@ public class User {
     // Comportamenti di dominio
     // ============================
 
-    public void changeEmail(ChangeUserEmailCommand cmd, UserValidator validator, UserPermissionPolicy permPolicy) {
+    /*
+    public void changeEmail(ChangeUserEmailCommand command, UserValidator validator, UserPermissionPolicy permPolicy) {
         // Verifica aggregate identity
 
-        if(!this.id.equals(cmd.userId())){
+        //Fixa il problema di null pointer exception
+        if (this.id == null) {
+            throw new IllegalStateException("User ID non può essere null");
+        }
+        if(!this.id.equals(command.userId())){
             throw new IllegalArgumentException("Command userId diverso da aggregate");
         }
-        //permessi : da implementare logica interfaccia
-        if(!permPolicy.canChangeEmail() ){
+
+        if(!permPolicy.canChangeEmail(this) ){
             throw new InvalidUserStateException("Permessi insufficienti per cambiare il nickname.");
         }
 
-        validator.validateEmail(cmd.newEmail());
+        validator.validateEmail(command.newEmail());
 
         mutateIfChanged(
                 this.email,
-                cmd.newEmail(),
+                command.newEmail(),
                 (e) -> this.email = e,
                 UserEmailChanged.of(
                         this.toSnapshot(),
-                        cmd.modifiedBy(),
-                        cmd.reason().orElse(null)
+                        command.modifiedBy(),
+                        command.reason().orElse(null)
                 )
         );
 
     }
+*/
+
+    public void changeEmail(Email newEmail, UserId modifiedBy, Optional<String> reason,
+                            UserValidator validator, UserPermissionPolicy permissionPolicy
+    ) {
+        if (!permissionPolicy.canChangeEmail(this)) {
+            throw new InvalidUserStateException("Permessi insufficienti per cambiare l'email.");
+        }
+        validator.validateEmail(newEmail);
+
+        mutateIfChanged(
+                this.email,
+                newEmail,
+                (e) -> this.email = e,
+                UserEmailChanged.of(
+                        this.toSnapshot(),
+                        modifiedBy,
+                        reason.orElse(null)
+                )
+        );
+    }
+
 
     public void changeNickname(Nickname newNickname, UserValidator validator) {
         validator.validateNickname(newNickname);
@@ -145,11 +172,11 @@ public class User {
                 this.nickname,
                 newNickname,
                 (n) -> this.nickname = n,
-                    UserNicknameChanged.of(
-                            this.toSnapshot(),
-                            this.id, // Qui si passa l'utente che ha fatto la modifica, potrebbe essere null se non è stato specificato
-                            null // Qui si può passare un motivo opzionale per il cambio nickname
-                    )
+                UserNicknameChanged.of(
+                        this.toSnapshot(),
+                        this.id, // Qui si passa l'utente che ha fatto la modifica, potrebbe essere null se non è stato specificato
+                        null // Qui si può passare un motivo opzionale per il cambio nickname
+                )
         );
     }
 
@@ -171,58 +198,93 @@ public class User {
                 )
         );
     }
-    //POTREBBE ESSERE SPLITTATO IN promoteTo e demoteTo PER CHIAREZZA SEMANTICA
-    public void changeRole(ChangeUserRoleCommand command, RoleAssignmentPolicy policy) throws InvalidUserStateException{
-        assert this.id != null;
-        if (!this.id.equals(command.userId())) {
-            throw new IllegalArgumentException("Command userId diverso da aggregate");
+
+    public void changeRole(Role newRole, UserId modifiedBy, Optional<String> reason,
+                           UserValidator validator, RoleAssignmentPolicy rolePolicy,
+                           UserPermissionPolicy permissionPolicy) throws InvalidUserStateException {
+        // Permessi di chi chiede la modifica
+        if (!permissionPolicy.canChangeRole(this)) {
+            throw new InvalidUserStateException("Permessi insufficienti per cambiare il ruolo.");
+        }
+        // Validazioni di dominio (se serve validator per regole aggiuntive)
+        // Ad es si potrebbe validare che non ci siano conflitti di stato attuale e nuovo ruolo:
+        validator.validateRoleAssignment(this.role, newRole);
+
+        if (Objects.equals(this.role, newRole)) {
+            return;
         }
 
-        if(!policy.canAssign(this.role, command.newRole())) {
-            throw new InvalidUserStateException("Cambio ruolo non consentito: " + command.newRole());
+        // applica la transizione di ruolo tramite policy
+        if (!rolePolicy.canAssign(this.role, newRole)) {
+            throw new InvalidUserStateException("Cambio ruolo non consentito: " + newRole);
         }
+        // Cattura snapshot pre-modifica
+        UserSnapshot oldSnapshot = this.toSnapshot();
+        this.role = newRole;
 
+        // Registra l'evento di cambio ruolo
         mutateIfChanged(
                 this.role,
-                command.newRole(),
+                newRole,
                 (r) -> this.role = r,
                 UserRoleChanged.of(
-                        this.toSnapshot(),
-                        command.modifiedBy(),
-                        command.reason().orElse(null)
+                        oldSnapshot,
+                        modifiedBy,
+                        reason.orElse(null)
                 )
         );
-
     }
 
+    public void changeStatus(UserStatus newStatus, UserId modifiedBy, Optional<String> reason,
+                             UserStatusTransitionPolicy transitionPolicy, UserPermissionPolicy permissionPolicy) throws InvalidUserStateException {
 
+        // Controlla i permessi
+        if (!permissionPolicy.canChangeRole(this)) {
+            throw new InvalidUserStateException("Permessi insufficienti per cambiare lo stato dell'utente.");
+        }
+        // Controlla la transizione di stato
+        transitionPolicy.validate(this.status, newStatus);
 
-    public void changeStatus(ChangeUserStatusCommand command, UserStatusTransitionPolicy policy) throws InvalidUserStateException{
-        policy.validate(this.status, command.newStatus());
+        if (this.status == newStatus) {
+            return; // Nessun cambiamento, esci subito
+        }
 
-        if(this.status == command.newStatus()) return; // Nessun cambiamento, esci subito
+            //ALTRE REGOLE........
 
-        DomainEvent event = switch (command.newStatus()) {
-            case ACTIVE -> UserActivated.of(id, command.modifiedBy(), command.reason().orElse(null));
+            //Cattura snapshot pre-modifica
+            UserSnapshot oldSnapshot = this.toSnapshot();
 
-            case DISABLED -> UserDeactivated.of(this.toSnapshot(), command.modifiedBy(), command.reason().orElse(null));
+        DomainEvent event = switch (newStatus) {
+
+            case ACTIVE -> UserActivated.of(id, modifiedBy, reason.orElse(null));
+
+            case DISABLED -> UserDeactivated.of(oldSnapshot, modifiedBy, reason.orElse(null));
 
             case BANNED -> {
-                var rule = new CannotBanAdminRule(this);
-                if (!rule.isSatisfied()) throw new InvalidUserStateException(rule.message());
-                yield   UserBanned.of(this.toSnapshot(), command.modifiedBy(), command.reason().orElse(null));
+                var adminRule = new CannotBanAdminRule(this);
+                if (!adminRule.isSatisfied()) throw new InvalidUserStateException(adminRule.message());
+                yield UserBanned.of(oldSnapshot, modifiedBy, reason.orElse(null));
             }
+            case DELETED -> UserDeleted.of(oldSnapshot, modifiedBy, reason.orElse(null));
 
-            case DELETED -> UserDeleted.of(this.toSnapshot(), command.modifiedBy(), command.reason().orElse(null));
-
-            case ARCHIVED -> UserArchived.of(this.toSnapshot(), command.modifiedBy(), command.reason().orElse(null));
-
+            case ARCHIVED -> UserArchived.of(oldSnapshot, modifiedBy, reason.orElse(null));
         };
+        // Aggiorna lo stato
+        this.status = newStatus;
+            // Registra evento
+        mutateIfChanged(
+                this.status,
+                newStatus,
+                (s) -> this.status = s,
+                event
+        );
 
+        // Log di transizione
         logTransition(log, event, "UserStatusChange");
-        mutateIfChanged(this.status, command.newStatus(), s -> this.status = s, event);
 
-    }
+        }
+
+
 
 
     // ============================
