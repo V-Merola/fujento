@@ -8,5 +8,7 @@ public enum Role {
     /** Gestore di evetni, squadre e altri utenti */
     MANAGER,
     /** Amministratore del sistema, ha accesso completo a tutte le funzionalità */
-    ADMIN
+    ADMIN,
+
+    USER
 }

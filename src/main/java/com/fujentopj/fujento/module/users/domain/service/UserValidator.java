@@ -1,6 +1,7 @@
 package com.fujentopj.fujento.module.users.domain.service;
 
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
+import com.fujentopj.fujento.module.users.domain.model.exception.InvalidRoleAssignmentException;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.Email;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.Nickname;
 
@@ -17,7 +18,7 @@ public interface UserValidator {
 
     /**
      * Valida la correttezza del nickname (lunghezza, formato, ecc.).
-     * Lancia {@link InvalidNicknameException} se non valido.
+     * Lancia {@linkInvalidNicknameException} se non valido.
      */
     void validateNickname(Nickname nickname);
 

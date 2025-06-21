@@ -7,9 +7,6 @@ public enum UserStatus {
     DISABLED,
     /** Profilo bannato, per violazione del sitema non può più accedere al sistema*/
     BANNED,
-
-    INACTIVE,
-    SUSPENDED,
-
+    ARCHIVED, // Profilo archiviato, non può più accedere al sistema
     DELETED; // Profilo cancellato, non può più accedere al sistema
 }

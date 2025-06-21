@@ -16,9 +16,9 @@ import java.util.Optional;
 * correlationId o metadati aggiuntivi, ma attualmente non è necessario.
 */
 public interface DomainEvent {
-    UserId agggregateId();
+    UserId aggregateId();
 
-    Instant occuredAt();
+    Instant occurredAt();
 
     default Optional<String> correlationId(){
         return Optional.empty();
@@ -30,4 +30,6 @@ public interface DomainEvent {
     default int version(){
         return 1; // Default version, can be overridden if needed
     }
+
+
 }

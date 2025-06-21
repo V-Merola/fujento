@@ -1,8 +1,9 @@
 package com.fujentopj.fujento.module.users.domain.model.valueObject;
 
+import java.io.Serializable;
 import java.util.regex.Pattern;
 
-public final class Nickname {
+public final class Nickname implements Serializable {
     private static final Pattern VALID_PATTERN = Pattern.compile("^[A-Za-z0-9_]{3,20}$");
     private final String value;
 

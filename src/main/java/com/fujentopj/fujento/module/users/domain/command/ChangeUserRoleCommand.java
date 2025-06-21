@@ -5,12 +5,13 @@ import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 
- public record ChangeUserRoleCommand(
+public record ChangeUserRoleCommand(
         UserId userId,
         Role newRole,
         UserId modifiedBy,
-        String reason,
+        Optional<String> reason,
         Instant occurredAt
 ) {
    public ChangeUserRoleCommand {

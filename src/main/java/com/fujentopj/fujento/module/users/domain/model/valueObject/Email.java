@@ -1,13 +1,14 @@
 package com.fujentopj.fujento.module.users.domain.model.valueObject;
 
+import java.io.Serializable;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
 
 //POSSIBILE MIGRAZIONE A RECORD: EMAIL DOVREBBE ESSERE IMMUTABILE E NON CAMBIARE DOPO LA CREAZIONE?
 
-public final class Email {
-    private static Pattern EMAIL_REGEX = Pattern.compile(
+public final class Email implements Serializable {
+    private static final Pattern EMAIL_REGEX = Pattern.compile(
             "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
 
     private final String value;

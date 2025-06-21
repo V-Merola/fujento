@@ -8,7 +8,7 @@ import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;
 import java.time.Instant;
 import java.util.Optional;
 
-public record UserDeleted (
+public record UserArchived(
         UserSnapshot snapshot,
         Instant occurredAt,
         UserId modifiedBy,
@@ -16,8 +16,9 @@ public record UserDeleted (
         Optional<String> correlationId,
         Optional<String> traceId
 ) implements DomainEvent, ModifiedByAware, ReasonAware {
-    public static UserDeleted of(UserSnapshot snapshot, UserId modifiedBy, String reason) {
-        return new UserDeleted(
+
+    public static UserArchived of(UserSnapshot snapshot, UserId modifiedBy, String reason) {
+        return new UserArchived(
                 snapshot,
                 Instant.now(),
                 modifiedBy,
@@ -41,5 +42,5 @@ public record UserDeleted (
     public int version() {
         return 1; // Versione dell'evento
     }
-}
 
+}

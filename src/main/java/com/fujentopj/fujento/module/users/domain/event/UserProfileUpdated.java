@@ -15,12 +15,12 @@ public record UserProfileUpdated(
         Instant occurredAt
 ) implements DomainEvent{
     @Override
-    public UserId agggregateId() {
+    public UserId aggregateId() {
         return userId;
     }
 
     @Override
-    public Instant occuredAt() {
+    public Instant occurredAt() {
         return occurredAt;
     }
 

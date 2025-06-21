@@ -1,25 +1,29 @@
 package com.fujentopj.fujento.module.users.domain.model.aggregate;
 
 
+import com.fujentopj.fujento.module.users.domain.command.ChangeUserEmailCommand;
 import com.fujentopj.fujento.module.users.domain.command.ChangeUserRoleCommand;
 import com.fujentopj.fujento.module.users.domain.command.ChangeUserStatusCommand;
 import com.fujentopj.fujento.module.users.domain.event.*;
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
 import com.fujentopj.fujento.module.users.domain.model.enums.UserStatus;
 import com.fujentopj.fujento.module.users.domain.model.exception.InvalidUserStateException;
+import com.fujentopj.fujento.module.users.domain.model.snapshot.UserSnapshot;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.*;
 import com.fujentopj.fujento.module.users.domain.service.UserValidator;
 import com.fujentopj.fujento.module.users.domain.service.policy.RoleAssignmentPolicy;
+import com.fujentopj.fujento.module.users.domain.service.policy.UserPermissionPolicy;
 import com.fujentopj.fujento.module.users.domain.service.policy.UserStatusTransitionPolicy;
 import com.fujentopj.fujento.module.users.domain.service.rule.CannotBanAdminRule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 
-import java.util.Collections;
-import java.util.Objects;
+import static com.fujentopj.fujento.module.users.domain.support.DomainEventLogger.logTransition;
 
 
 /**
@@ -48,6 +52,7 @@ public class User {
 
     private boolean dirty = false;
 
+    private static final Logger log = LoggerFactory.getLogger(User.class);
     // ============================
     // Factory Method
     // ============================
@@ -64,11 +69,11 @@ public class User {
         validator.validateRoleAssignment(null, role);
 
         User user = new User(id, email, password, nickname, role, UserStatus.ACTIVE);
-        //user.registerEvent(new UserRegistered(id.value(), email.value(), nickname.value(), Instant.now()));
+
+        //Registra l'evento di registrazione dell'utente
+        // L'evento contiene lo snapshot dell'utente al momento della registrazione
         user.registerEvent(new UserRegistered(
-                id,
-                email,
-                nickname,
+                user.toSnapshot(),
                 Instant.now()
         ));
         return user;
@@ -93,6 +98,12 @@ public class User {
         this.status = Objects.requireNonNull(status);
     }
 
+    /**
+     * Costruttore protetto per ORM (es. Hibernate).
+     * Non dovrebbe essere usato direttamente, ma solo da framework di persistenza.
+     * @deprecated Per favore usa il factory method {@link #register(UserId, Email, HashedPassword, Nickname, Role, UserValidator)}
+     */
+    @Deprecated(forRemoval = false)
     protected User() {
         this.id = null; // Per ORM
     }
@@ -101,20 +112,30 @@ public class User {
     // Comportamenti di dominio
     // ============================
 
-    public void changeEmail(Email newEmail, UserValidator validator) {
-        validator.validateEmail(newEmail);
+    public void changeEmail(ChangeUserEmailCommand cmd, UserValidator validator, UserPermissionPolicy permPolicy) {
+        // Verifica aggregate identity
+
+        if(!this.id.equals(cmd.userId())){
+            throw new IllegalArgumentException("Command userId diverso da aggregate");
+        }
+        //permessi : da implementare logica interfaccia
+        if(!permPolicy.canChangeEmail() ){
+            throw new InvalidUserStateException("Permessi insufficienti per cambiare il nickname.");
+        }
+
+        validator.validateEmail(cmd.newEmail());
 
         mutateIfChanged(
                 this.email,
-                newEmail,
+                cmd.newEmail(),
                 (e) -> this.email = e,
-                new UserEmailChanged(
-                        id,
-                        newEmail,
-                        Instant.now()
+                UserEmailChanged.of(
+                        this.toSnapshot(),
+                        cmd.modifiedBy(),
+                        cmd.reason().orElse(null)
                 )
         );
-        
+
     }
 
     public void changeNickname(Nickname newNickname, UserValidator validator) {
@@ -124,13 +145,14 @@ public class User {
                 this.nickname,
                 newNickname,
                 (n) -> this.nickname = n,
-                new UserNicknameChanged(
-                        id,
-                        newNickname,
-                        Instant.now()
-                )
+                    UserNicknameChanged.of(
+                            this.toSnapshot(),
+                            this.id, // Qui si passa l'utente che ha fatto la modifica, potrebbe essere null se non è stato specificato
+                            null // Qui si può passare un motivo opzionale per il cambio nickname
+                    )
         );
     }
+
 
     public void changePassword(HashedPassword newPassword) throws InvalidUserStateException {
         Objects.requireNonNull(newPassword, "Password non può essere null");
@@ -151,6 +173,11 @@ public class User {
     }
     //POTREBBE ESSERE SPLITTATO IN promoteTo e demoteTo PER CHIAREZZA SEMANTICA
     public void changeRole(ChangeUserRoleCommand command, RoleAssignmentPolicy policy) throws InvalidUserStateException{
+        assert this.id != null;
+        if (!this.id.equals(command.userId())) {
+            throw new IllegalArgumentException("Command userId diverso da aggregate");
+        }
+
         if(!policy.canAssign(this.role, command.newRole())) {
             throw new InvalidUserStateException("Cambio ruolo non consentito: " + command.newRole());
         }
@@ -159,66 +186,59 @@ public class User {
                 this.role,
                 command.newRole(),
                 (r) -> this.role = r,
-                new UserRoleChanged(
-                        id,
-                        command.newRole(),
-                        command.modifiedBy(),// Qui si passa l'utente che ha fatto la modifica
-                        command.occurredAt(),
-                        command.reason()
+                UserRoleChanged.of(
+                        this.toSnapshot(),
+                        command.modifiedBy(),
+                        command.reason().orElse(null)
                 )
         );
 
     }
-    /*
-    private void  changeStatusTo(UserStatus newStatus, DomainEvent event, UserStatusTransitionPolicy policy) throws InvalidUserStateException {
-        //Objects.requireNonNull(newStatus, "Nuovo stato non può essere null");
-        policy.validate(this.status, newStatus);
-        mutateIfChanged(
-                this.status,
-                newStatus,
-                (s) -> this.status = s,
-                event
-        );
-    }
-    */
+
+
+
     public void changeStatus(ChangeUserStatusCommand command, UserStatusTransitionPolicy policy) throws InvalidUserStateException{
         policy.validate(this.status, command.newStatus());
 
-        DomainEvent event = switch (command.newStatus()) {
-            case ACTIVE -> new UserActivated(id, command.occurredAt(), command.modifiedBy(), command.reason());
-            case DISABLED -> new UserDeactivated(id, command.occurredAt(), command.modifiedBy(), command.reason());
-            case BANNED -> new UserBanned(id, command.occurredAt(), command.modifiedBy(), command.reason());
-            case DELETED -> new UserDeleted(id, command.occurredAt(), command.modifiedBy(), command.reason());
+        if(this.status == command.newStatus()) return; // Nessun cambiamento, esci subito
 
-            case INACTIVE, SUSPENDED -> null;
+        DomainEvent event = switch (command.newStatus()) {
+            case ACTIVE -> UserActivated.of(id, command.modifiedBy(), command.reason().orElse(null));
+
+            case DISABLED -> UserDeactivated.of(this.toSnapshot(), command.modifiedBy(), command.reason().orElse(null));
+
+            case BANNED -> {
+                var rule = new CannotBanAdminRule(this);
+                if (!rule.isSatisfied()) throw new InvalidUserStateException(rule.message());
+                yield   UserBanned.of(this.toSnapshot(), command.modifiedBy(), command.reason().orElse(null));
+            }
+
+            case DELETED -> UserDeleted.of(this.toSnapshot(), command.modifiedBy(), command.reason().orElse(null));
+
+            case ARCHIVED -> UserArchived.of(this.toSnapshot(), command.modifiedBy(), command.reason().orElse(null));
+
         };
 
-    }
-
-    /*
-    public void activate(UserStatusTransitionPolicy policy) throws InvalidUserStateException {
-
-        changeStatusTo(UserStatus.ACTIVE, new UserActivated(id, Instant.now()), policy);
+        logTransition(log, event, "UserStatusChange");
+        mutateIfChanged(this.status, command.newStatus(), s -> this.status = s, event);
 
     }
 
 
-    public void deactivate(UserStatusTransitionPolicy policy) throws InvalidUserStateException {
-        if(this.status == UserStatus.BANNED){
-            throw new InvalidUserStateException("Impossibile disattivare un utente bannato.");
-        }
-        changeStatusTo(UserStatus.DISABLED, new UserDeactivated(id, Instant.now()),policy);
-    }
+    // ============================
+    // Snapshot
+    // ============================
+    /**Questo metodo crea uno snapshot dell'utente, utile per la persistenza o la serializzazione.*/
 
-
-    public void ban(UserStatusTransitionPolicy policy) throws InvalidUserStateException {
-        var rule = new CannotBanAdminRule(this);
-        if(!rule.isSatisfied()) {
-            throw new InvalidUserStateException(rule.message());
-        }
-        changeStatusTo(UserStatus.BANNED, new UserBanned(id, Instant.now()), policy);
+    public UserSnapshot toSnapshot() {
+        return new UserSnapshot(
+                this.id,
+                this.email,
+                this.nickname,
+                this.role,
+                this.status
+        );
     }
-*/
 
     // ============================
     // Event handling
