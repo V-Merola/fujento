@@ -1,12 +1,11 @@
-package com.fujentopj.fujento.module.users.domain.service.policy;
+package com.fujentopj.fujento.module.users.domain.service.policy.impl;
 
 import com.fujentopj.fujento.module.users.domain.model.aggregate.User;
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
 import com.fujentopj.fujento.module.users.domain.model.enums.UserStatus;
-import com.fujentopj.fujento.module.users.domain.model.exception.InvalidUserStateException;
-import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;
+import com.fujentopj.fujento.module.users.domain.service.policy.UserPermissionPolicy;
 
-public class DefaultUserPermissionPolicy implements UserPermissionPolicy{
+public class DefaultUserPermissionPolicy implements UserPermissionPolicy {
     private final Role currentUserRole;
     private final String currentUserId;
 

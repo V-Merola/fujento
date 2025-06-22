@@ -1,12 +1,13 @@
-package com.fujentopj.fujento.module.users.domain.service.policy;
+package com.fujentopj.fujento.module.users.domain.service.policy.impl;
 
 import com.fujentopj.fujento.module.users.domain.model.enums.UserStatus;
 import com.fujentopj.fujento.module.users.domain.model.exception.InvalidUserStateException;
+import com.fujentopj.fujento.module.users.domain.service.policy.UserStatusTransitionPolicy;
 
 import java.util.Map;
 import java.util.Set;
 
-public class DefaultUserStatusTransitionPolicy implements UserStatusTransitionPolicy{
+public class DefaultUserStatusTransitionPolicy implements UserStatusTransitionPolicy {
 
     private static final Map<UserStatus, Set<UserStatus>> allowedTransitions = Map.of(
             UserStatus.ACTIVE, Set.of(UserStatus.DISABLED, UserStatus.BANNED, UserStatus.ARCHIVED),

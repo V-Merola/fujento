@@ -41,27 +41,32 @@ public class ChangeUserRoleService {
                 throw new IllegalArgumentException("Reason troppo lungo");
             }
         });
-        // 2. Carica l’aggregate
+        // Carica l’aggregate
         User user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new EntityNotFoundException("Utente non trovato con id: " + command.userId()));
 
-        // 3. Invoca il metodo di dominio
+        // Verifica permessi: UserPermissionPolicy iniettato (implementazione in application/security)
+        if(!userPermissionPolicy.canChangeRole(user)){
+            throw new IllegalStateException("Permessi insufficienti per cambiare il ruolo dell'utente");
+        }
+
+        // Validazioni di formato/regole via UserValidator
+        userValidator.validateRoleAssignment(user.getRole(), command.newRole());
+
+        // Invoca il metodo di dominio
         user.changeRole(
                 command.newRole(),
                 command.modifiedBy(),
                 command.reason(),
-                userValidator,
-                roleAssignmentPolicy,
-                userPermissionPolicy
+                roleAssignmentPolicy
         );
-
-        // 4. Persisti
+        // Salva l'aggregate
         userRepository.save(user);
 
-        // 5. Pubblica eventi generati
+        // Pubblica eventi generati
         eventPublisher.publishAll(user.getDomainEvents());
 
-        // 6. Reset degli eventi di dominio
+        //Reset degli eventi di dominio
         user.clearDomainEvents();
     }
 

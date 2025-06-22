@@ -1,6 +1,7 @@
-package com.fujentopj.fujento.module.users.domain.service.policy;
+package com.fujentopj.fujento.module.users.domain.service.policy.impl;
 
 import com.fujentopj.fujento.module.users.domain.model.enums.Role;
+import com.fujentopj.fujento.module.users.domain.service.policy.RoleAssignmentPolicy;
 
 /**
  * Implementazione predefinita di RoleAssignmentPolicy.

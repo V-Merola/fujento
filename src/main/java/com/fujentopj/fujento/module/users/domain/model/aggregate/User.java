@@ -12,8 +12,7 @@ import com.fujentopj.fujento.module.users.domain.service.policy.RoleAssignmentPo
 import com.fujentopj.fujento.module.users.domain.service.policy.UserPermissionPolicy;
 import com.fujentopj.fujento.module.users.domain.service.policy.UserStatusTransitionPolicy;
 import com.fujentopj.fujento.module.users.domain.service.rule.CannotBanAdminRule;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 
 import java.time.Instant;
@@ -50,7 +49,6 @@ public class User {
 
     private boolean dirty = false;
 
-    private static final Logger log = LoggerFactory.getLogger(User.class);
 
     // ============================
     // Factory Method
@@ -60,12 +58,18 @@ public class User {
             Email email,
             HashedPassword password,
             Nickname nickname,
-            Role role,
-            UserValidator validator
+            Role role
+            //Spostare la logica di validazione in un Application Service?
+           // UserValidator validator
     ) {
-        validator.validateEmail(email);
-        validator.validateNickname(nickname);
-        validator.validateRoleAssignment(null, role);
+        //La validazione di unicità (email duplicata)
+        // deve essere effettuata dall’Application Service / Domain Service
+        // che conosce il repository, non dal dominio puro.
+        // Il UserValidator probabilmente deve delegare a un’interfaccia (port out) UniqueEmailChecker,
+        // chiamato dall’Application Service, non dal dominio.
+       // validator.validateEmail(email);
+        //validator.validateNickname(nickname);
+        //validator.validateRoleAssignment(null, role);
 
         User user = new User(id, email, password, nickname, role, UserStatus.ACTIVE);
 
@@ -101,7 +105,7 @@ public class User {
      * Costruttore protetto per ORM (es. Hibernate).
      * Non dovrebbe essere usato direttamente, ma solo da framework di persistenza.
      *
-     * @deprecated Per favore usa il factory method {@link #register(UserId, Email, HashedPassword, Nickname, Role, UserValidator)}
+     * @deprecated Per favore usa il factory method {@link#register(UserId, Email, HashedPassword, Nickname, Role, UserValidator)}
      */
     @Deprecated(forRemoval = false)
     protected User() {
@@ -111,38 +115,6 @@ public class User {
     // ============================
     // Comportamenti di dominio
     // ============================
-
-    /*
-    public void changeEmail(ChangeUserEmailCommand command, UserValidator validator, UserPermissionPolicy permPolicy) {
-        // Verifica aggregate identity
-
-        //Fixa il problema di null pointer exception
-        if (this.id == null) {
-            throw new IllegalStateException("User ID non può essere null");
-        }
-        if(!this.id.equals(command.userId())){
-            throw new IllegalArgumentException("Command userId diverso da aggregate");
-        }
-
-        if(!permPolicy.canChangeEmail(this) ){
-            throw new InvalidUserStateException("Permessi insufficienti per cambiare il nickname.");
-        }
-
-        validator.validateEmail(command.newEmail());
-
-        mutateIfChanged(
-                this.email,
-                command.newEmail(),
-                (e) -> this.email = e,
-                UserEmailChanged.of(
-                        this.toSnapshot(),
-                        command.modifiedBy(),
-                        command.reason().orElse(null)
-                )
-        );
-
-    }
-*/
 
     public void changeEmail(Email newEmail, UserId modifiedBy, Optional<String> reason,
                             UserValidator validator, UserPermissionPolicy permissionPolicy
@@ -200,15 +172,21 @@ public class User {
     }
 
     public void changeRole(Role newRole, UserId modifiedBy, Optional<String> reason,
-                           UserValidator validator, RoleAssignmentPolicy rolePolicy,
-                           UserPermissionPolicy permissionPolicy) throws InvalidUserStateException {
-        // Permessi di chi chiede la modifica
-        if (!permissionPolicy.canChangeRole(this)) {
-            throw new InvalidUserStateException("Permessi insufficienti per cambiare il ruolo.");
+                            RoleAssignmentPolicy rolePolicy
+                           ) throws InvalidUserStateException {
+
+        // non nel dominio puro, ma qui lo mettiamo per completezza.
+        if (newRole == null) {
+            throw new InvalidUserStateException("Il nuovo ruolo non può essere null.");
         }
+        //Spostato nel layer application: service ChangeUserRoleService
+//        if (!permissionPolicy.canChangeRole(this)) {
+//            throw new InvalidUserStateException("Permessi insufficienti per cambiare il ruolo.");
+//        }
         // Validazioni di dominio (se serve validator per regole aggiuntive)
         // Ad es si potrebbe validare che non ci siano conflitti di stato attuale e nuovo ruolo:
-        validator.validateRoleAssignment(this.role, newRole);
+        //spostato nel layer application: service ChangeUserRoleService
+        //validator.validateRoleAssignment(this.role, newRole);
 
         if (Objects.equals(this.role, newRole)) {
             return;
@@ -220,7 +198,7 @@ public class User {
         }
         // Cattura snapshot pre-modifica
         UserSnapshot oldSnapshot = this.toSnapshot();
-        this.role = newRole;
+
 
         // Registra l'evento di cambio ruolo
         mutateIfChanged(
@@ -236,13 +214,19 @@ public class User {
     }
 
     public void changeStatus(UserStatus newStatus, UserId modifiedBy, Optional<String> reason,
-                             UserStatusTransitionPolicy transitionPolicy, UserPermissionPolicy permissionPolicy) throws InvalidUserStateException {
+                             UserStatusTransitionPolicy transitionPolicy) throws InvalidUserStateException {
 
-        // Controlla i permessi
-        if (!permissionPolicy.canChangeRole(this)) {
-            throw new InvalidUserStateException("Permessi insufficienti per cambiare lo stato dell'utente.");
-        }
+        // Controlla i permessi. Stessa cosa del metodo changeRole.
+        // Nota: il controllo dei permessi è fatto nel layer di Application Service, classe : ChangeUserStatusService
+        // non nel dominio puro, ma qui lo mettiamo per completezza.
+//        if (!permissionPolicy.canChangeStatus(this)) {
+//            throw new InvalidUserStateException("Permessi insufficienti per cambiare lo stato dell'utente.");
+//        }
         // Controlla la transizione di stato
+        if( newStatus == null) {
+            throw new InvalidUserStateException("Nuovo stato non può essere null.");
+        }
+
         transitionPolicy.validate(this.status, newStatus);
 
         if (this.status == newStatus) {
@@ -251,8 +235,8 @@ public class User {
 
             //ALTRE REGOLE........
 
-            //Cattura snapshot pre-modifica
-            UserSnapshot oldSnapshot = this.toSnapshot();
+        //Cattura snapshot pre-modifica
+        UserSnapshot oldSnapshot = this.toSnapshot();
 
         DomainEvent event = switch (newStatus) {
 
@@ -269,8 +253,6 @@ public class User {
 
             case ARCHIVED -> UserArchived.of(oldSnapshot, modifiedBy, reason.orElse(null));
         };
-        // Aggiorna lo stato
-        this.status = newStatus;
             // Registra evento
         mutateIfChanged(
                 this.status,
@@ -279,13 +261,37 @@ public class User {
                 event
         );
 
-        // Log di transizione
-        logTransition(log, event, "UserStatusChange");
-
         }
 
+    //AGGIUNGERE METODI PER USER DELETED / ARCHIVED
+    /**
+     * Metodo per archiviare l'utente.
+     * Questo metodo può essere usato per archiviare un utente senza eliminarlo fisicamente dal database.
+     * L'utente viene marcato come ARCHIVED e viene registrato un evento di archiviazione.
+     */
+    public void archive(UserId modifiedBy, Optional<String> reason) {
+        if (this.status == UserStatus.DELETED || this.status == UserStatus.ARCHIVED) {
+            throw new InvalidUserStateException("Utente già archiviato o eliminato.");
+        }
+
+        // Cattura snapshot pre-modifica
+        UserSnapshot oldSnapshot = this.toSnapshot();
+
+        // Cambia lo stato a ARCHIVED
+        this.status = UserStatus.ARCHIVED;
+
+        //implementa la logica per archiviare l'utente?
 
 
+
+        // Registra l'evento di archiviazione
+        mutateIfChanged(
+                this.status,
+                UserStatus.ARCHIVED,
+                (s) -> this.status = s,
+                UserArchived.of(oldSnapshot, modifiedBy, reason.orElse(null))
+        );
+    }
 
     // ============================
     // Snapshot

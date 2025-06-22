@@ -8,6 +8,7 @@ import com.fujentopj.fujento.module.users.domain.service.policy.UserStatusTransi
 import com.fujentopj.fujento.module.users.port.out.DomainEventPublisher;
 import com.fujentopj.fujento.module.users.port.out.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChangeUserStatusService {
@@ -27,7 +28,7 @@ public class ChangeUserStatusService {
         this.statusTransitionPolicy = statusTransitionPolicy;
         this.eventPublisher = eventPublisher;
     }
-
+    @Transactional
     public void handle(ChangeUserStatusCommand command){
         // 1. Validazioni applicative superficiali (null check, length reason, etc.)
         if (command.newStatus() == null) {
@@ -42,13 +43,25 @@ public class ChangeUserStatusService {
         User user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new EntityNotFoundException("Utente non trovato con id: " + command.userId()));
 
+        // Controlla se l'utente ha i permessi per cambiare lo stato
+        //Utilizzando Spring Security, si potrebbe  non passare UserPermissionPolicy
+        // ma usare context security in application.
+        // In questo caso, UserPermissionPolicy è un'astrazione per verificare i permessi
+        // dell'utente corrente.
+        // Questo permette di testare facilmente la logica di dominio senza dipendere da Spring Security.
+        // Se l'utente corrente non ha i permessi, lancia un'eccezione
+        if (!permissionPolicy.canChangeStatus(user)) {
+            throw new IllegalStateException("Permessi insufficienti per cambiare lo stato dell'utente");
+        }
+        // Eventuale controllo expectedVersion
+        // if (user.getVersion() != command.expectedVersion()) throw new ConcurrentModificationException(...);
+
         // 3. Invoca il metodo di dominio
         user.changeStatus(
                 command.newStatus(),
                 command.modifiedBy(),
                 command.reason(),
-                statusTransitionPolicy,
-                permissionPolicy
+                statusTransitionPolicy
         );
 
         // 4. Persisti l'aggregate
