@@ -1,0 +1,6 @@
+projectKey=fujento-token
+serverUrl=http://localhost:9000
+serverVersion=25.6.0.109173
+dashboardUrl=http://localhost:9000/dashboard?id=fujento-token
+ceTaskId=a68bfb1b-a5bd-4146-b764-b7bd5fe64965
+ceTaskUrl=http://localhost:9000/api/ce/task?id=a68bfb1b-a5bd-4146-b764-b7bd5fe64965

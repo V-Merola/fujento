@@ -3,6 +3,7 @@ package com.fujentopj.fujento.module.users.application.service;
 import com.fujentopj.fujento.module.users.application.command.ChangeUserEmailCommand;
 import com.fujentopj.fujento.module.users.application.exception.EntityNotFoundException;
 import com.fujentopj.fujento.module.users.domain.model.aggregate.User;
+import com.fujentopj.fujento.module.users.domain.model.exception.InvalidUserStateException;
 import com.fujentopj.fujento.module.users.domain.service.UserValidator;
 import com.fujentopj.fujento.module.users.domain.service.policy.UserPermissionPolicy;
 import com.fujentopj.fujento.module.users.port.out.DomainEventPublisher;
@@ -31,12 +32,15 @@ public class ChangeUserEmailService {
                 () ->new EntityNotFoundException("User not found with id: " + command.userId().value())
         );
 
+        if (!userPermissionPolicy.canChangeEmail(user)) {
+            throw new InvalidUserStateException("Permessi insufficienti per cambiare l'email.");
+        }
+        userValidator.validateEmail(command.newEmail());
+
         user.changeEmail(
                 command.newEmail(),
                 command.modifiedBy(),
-                command.reason(),
-                userValidator,
-                userPermissionPolicy
+                command.reason()
         );
         userRepository.save(user);
         eventPublisher.publishAll(user.getDomainEvents());

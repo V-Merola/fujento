@@ -24,9 +24,9 @@ public class DefaultUserStatusTransitionPolicy implements UserStatusTransitionPo
     @Override
     public void validate(UserStatus from, UserStatus to) throws InvalidUserStateException {
         //Protezione specifica per vietare archiviazione di utenti bannati, gia dichiarata in Map-> BANNED.Set.of()
-//        if(from == UserStatus.BANNED && to == UserStatus.ARCHIVED) {
-//            throw new InvalidUserStateException("Non è consentito archiviare utenti bannati.");
-//        }
+        if(from == UserStatus.BANNED && to == UserStatus.ARCHIVED) {
+            throw new InvalidUserStateException("Non è consentito archiviare utenti bannati.");
+        }
 
         if (!canTransition(from, to)) {
             throw new InvalidUserStateException("Transizione di stato non consentita: da " + from + " a " + to);

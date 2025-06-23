@@ -31,3 +31,4 @@ build/
 
 ### VS Code ###
 .vscode/
+sonar-project.properties

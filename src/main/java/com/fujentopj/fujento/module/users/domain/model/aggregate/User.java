@@ -9,7 +9,6 @@ import com.fujentopj.fujento.module.users.domain.model.snapshot.UserSnapshot;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.*;
 import com.fujentopj.fujento.module.users.domain.service.UserValidator;
 import com.fujentopj.fujento.module.users.domain.service.policy.RoleAssignmentPolicy;
-import com.fujentopj.fujento.module.users.domain.service.policy.UserPermissionPolicy;
 import com.fujentopj.fujento.module.users.domain.service.policy.UserStatusTransitionPolicy;
 import com.fujentopj.fujento.module.users.domain.service.rule.CannotBanAdminRule;
 
@@ -116,13 +115,13 @@ public class User {
     // Comportamenti di dominio
     // ============================
 
-    public void changeEmail(Email newEmail, UserId modifiedBy, Optional<String> reason,
-                            UserValidator validator, UserPermissionPolicy permissionPolicy
-    ) {
-        if (!permissionPolicy.canChangeEmail(this)) {
-            throw new InvalidUserStateException("Permessi insufficienti per cambiare l'email.");
-        }
-        validator.validateEmail(newEmail);
+    public void changeEmail(Email newEmail, UserId modifiedBy, Optional<String> reason) {
+        //spostato in ChangeUserEmailService
+//        if (!permissionPolicy.canChangeEmail(this)) {
+//            throw new InvalidUserStateException("Permessi insufficienti per cambiare l'email.");
+//        }
+        //Spostato in ChangeEmailService: chiama DB
+       // validator.validateEmail(newEmail);
 
         mutateIfChanged(
                 this.email,
