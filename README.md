@@ -1,2 +1,3 @@
 # fujento
-Spring Modulith Application 
+Spring Modulith Application.
+DDD HEXAGONAL ARCHITECTURE
