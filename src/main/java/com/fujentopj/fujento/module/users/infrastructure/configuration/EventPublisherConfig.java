@@ -1,4 +1,4 @@
-package com.fujentopj.fujento.module.users.configuration;
+package com.fujentopj.fujento.module.users.infrastructure.configuration;
 
 import com.fujentopj.fujento.module.users.adapter.out.event.v1.SpringDomainEventPublisher;
 import com.fujentopj.fujento.module.users.port.out.DomainEventPublisher;

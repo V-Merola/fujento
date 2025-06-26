@@ -9,6 +9,7 @@ import com.fujentopj.fujento.module.users.domain.service.policy.UserPermissionPo
 import com.fujentopj.fujento.module.users.port.out.DomainEventPublisher;
 import com.fujentopj.fujento.module.users.port.out.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChangeUserRoleService {
@@ -30,6 +31,7 @@ public class ChangeUserRoleService {
         this.roleAssignmentPolicy = roleAssignmentPolicy;
         this.eventPublisher = domainEventPublisher;
     }
+    @Transactional
     public void handle(ChangeUserRoleCommand command) {
         // 1. Validazioni applicative superficiali:
         if (command.newRole() == null) {

@@ -18,10 +18,12 @@ public final class HashedPassword {
             throw new IllegalArgumentException("Hashed password cannot be null or blank");
         }
         String trimmedValue = value.trim();
-
-        if (trimmedValue.length() <60) {
-            throw new IllegalArgumentException("Hashed password must be at least 60 characters long");
+        if (!trimmedValue.matches("^\\$2[aby]\\$.{56}$")) {
+            throw new IllegalArgumentException("Not a valid bcrypt hash");
         }
+//        if (trimmedValue.length() <60) {
+//            throw new IllegalArgumentException("Hashed password must be at least 60 characters long");
+//        }
         return new HashedPassword(trimmedValue);
     }
 

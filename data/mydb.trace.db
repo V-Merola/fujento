@@ -1,0 +1,3 @@
+2025-06-26 20:56:19.049930+02:00 jdbc[14]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "EVENT_PUBLICATON" not found; SQL statement:
+SELECT * FROM event_PUBLICATON [42102-232]

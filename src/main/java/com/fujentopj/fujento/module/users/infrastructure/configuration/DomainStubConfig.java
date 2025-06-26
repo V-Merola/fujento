@@ -1,4 +1,4 @@
-package com.fujentopj.fujento.module.users.configuration;
+package com.fujentopj.fujento.module.users.infrastructure.configuration;
 
 import java.util.Map;
 import java.util.Optional;
@@ -31,10 +31,10 @@ public class DomainStubConfig {
      * NOTA: questo è solo per sviluppo iniziale. Successivamente implementerai
      * un adapter reale (JPA, ecc.) che sostituirà questo bean.
      */
-    @Bean
-    public UserRepository userRepository() {
-        return new InMemoryUserRepository();
-    }
+//    @Bean
+//    public UserRepository userRepository() {
+//        return new InMemoryUserRepository();
+//    }
 
     /**
      * Stub RoleAssignmentPolicy: consente sempre ogni assegnazione di ruolo.
@@ -110,50 +110,55 @@ public class DomainStubConfig {
      * InMemoryUserRepository: implementazione fittizia di UserRepository.
      * Mantiene una mappa interna per salvare User in memoria.
      */
-    static class InMemoryUserRepository implements UserRepository {
-
-        // Mappa id -> User
-        private final Map<String, User> store = new ConcurrentHashMap<>();
-
-        @Override
-        public boolean existsByEmail(Email email) {
-            if (email == null) return false;
-            String v = email.getValue();
-            return store.values().stream()
-                    .anyMatch(u -> u.getEmail() != null && v.equalsIgnoreCase(u.getEmail().getValue()));
-        }
-
-        @Override
-        public boolean existsByNickname(Nickname nickname) {
-            if (nickname == null) return false;
-            String v = nickname.getValue();
-            return store.values().stream()
-                    .anyMatch(u -> u.getNickname() != null && v.equalsIgnoreCase(u.getNickname().getValue()));
-        }
-
-        @Override
-        public Optional<User> findById(UserId id) {
-            if (id == null) return Optional.empty();
-            return Optional.ofNullable(store.get(id.getValue()));
-        }
-
-        @Override
-        public void save(User user) {
-            if (user == null || user.getId() == null) {
-                throw new IllegalArgumentException("User o UserId nullo non permesso");
-            }
-            // Nota: se salvi un aggregate User che è già esistente, stai sostituendo la referenza.
-            store.put(user.getId().toString(), user);
-
-        }
-
-        @Override
-        public void delete(User user) {
-            if (user != null && user.getId() != null) {
-                store.remove(user.getId().getValue());
-            }
-        }
-
-        // Se la tua interfaccia UserRepository ha altri metodi, implementali qui.
-    }
+//    static class InMemoryUserRepository implements UserRepository {
+//
+//        // Mappa id -> User
+//        private final Map<String, User> store = new ConcurrentHashMap<>();
+//
+//        @Override
+//        public boolean existsByEmail(Email email) {
+//            if (email == null) return false;
+//            String v = email.getValue();
+//            return store.values().stream()
+//                    .anyMatch(u -> u.getEmail() != null && v.equalsIgnoreCase(u.getEmail().getValue()));
+//        }
+//
+//        @Override
+//        public boolean existsByNickname(Nickname nickname) {
+//            if (nickname == null) return false;
+//            String v = nickname.getValue();
+//            return store.values().stream()
+//                    .anyMatch(u -> u.getNickname() != null && v.equalsIgnoreCase(u.getNickname().getValue()));
+//        }
+//
+//        @Override
+//        public Optional<User> findById(UserId id) {
+//            if (id == null) return Optional.empty();
+//            return Optional.ofNullable(store.get(id.getValue()));
+//        }
+//
+//        @Override
+//        public Optional<User> findByEmail(Email email) {
+//            return Optional.empty();
+//        }
+//
+//        @Override
+//        public User save(User user) {
+//            if (user == null || user.getId() == null) {
+//                throw new IllegalArgumentException("User o UserId nullo non permesso");
+//            }
+//            // Nota: se salvi un aggregate User che è già esistente, stai sostituendo la referenza.
+//            store.put(user.getId().toString(), user);
+//            return user;
+//        }
+//
+//        @Override
+//        public void delete(User user) {
+//            if (user != null && user.getId() != null) {
+//                store.remove(user.getId().getValue());
+//            }
+//        }
+//
+//        // Se la tua interfaccia UserRepository ha altri metodi, implementali qui.
+//    }
 }

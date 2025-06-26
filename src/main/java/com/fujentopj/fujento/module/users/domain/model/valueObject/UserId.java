@@ -38,6 +38,13 @@ public record UserId(UUID value) implements Identifier {
         return new UserId(uuid);
     }
 
+    public static UserId of(UUID id) {
+        if (id == null) {
+            throw new IllegalArgumentException("UserId non può essere null");
+        }
+        return new UserId(id);
+    }
+
     public UUID getValue() {
         return value;
     }

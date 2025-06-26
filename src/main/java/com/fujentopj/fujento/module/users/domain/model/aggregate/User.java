@@ -42,7 +42,6 @@ public class User {
     private Role role;
     private UserStatus status;
 
-    private long version; //gestito da Hibernate (@Version) nel layer persistence
 
     private final List<DomainEvent> domainEvents = new ArrayList<>();
 
@@ -306,7 +305,20 @@ public class User {
                 this.status
         );
     }
+    // ✅ Metodo statico per ripristinare da persistence
 
+    public static User rehydrate(
+            UserId id,
+            Email email,
+            HashedPassword password,
+            Nickname nickname,
+            Role role,
+            UserStatus status
+    ) {
+        // Questo metodo è usato per ricostruire l'oggetto User da uno snapshot o da un database.
+        // Non dovrebbe essere usato direttamente, ma solo da framework di persistenza.
+        return new User(id, email, password, nickname, role, status);
+    }
     // ============================
     // Event handling
     // ============================
@@ -360,6 +372,9 @@ public class User {
         return status;
     }
 
+    public HashedPassword getPassword() {
+        return password;
+    }
     // ============================
     // Equals & HashCode
     // ============================
