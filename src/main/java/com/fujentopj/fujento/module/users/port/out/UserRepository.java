@@ -17,7 +17,7 @@ public interface UserRepository {
     boolean existsByNickname(Nickname nickname);
 
     boolean existsByEmail(Email email);
-    //User save(User user);
+
     void delete(User user);
     //Altri metodi domain-oriented non jpa oriented
 }

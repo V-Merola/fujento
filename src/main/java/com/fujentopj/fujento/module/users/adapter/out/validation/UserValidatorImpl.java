@@ -1,6 +1,7 @@
 // src/main/java/com/fujentopj/fujento/module/users/adapter/out/validation/UserValidatorImpl.java
 package com.fujentopj.fujento.module.users.adapter.out.validation;
 
+import com.fujentopj.fujento.module.users.domain.model.exception.DuplicateNicknameException;
 import org.springframework.stereotype.Component;
 import com.fujentopj.fujento.module.users.domain.service.UserValidator;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.Email;
@@ -39,13 +40,14 @@ public class UserValidatorImpl implements UserValidator {
     }
 
     @Override
-    public void validateEmail(Email email) {
+    public void validateEmail(Email email){
         // Il VO Email.of(...) ha già validato sintassi quando è stato creato.
         // Qui controlliamo unicità:
         if (userRepository.existsByEmail(email)) {
            // throw new DuplicateEmailException("Email già in uso: " + email.getValue());
             throw new RuntimeException("Email già in uso: " + email.getValue());
         }
+        //return  true;
     }
 
     @Override
@@ -55,6 +57,9 @@ public class UserValidatorImpl implements UserValidator {
         // if (userRepository.existsByNickname(nickname)) throw new DuplicateNicknameException(...);
         // Altrimenti, nessun controllo extra.
         // (Se non serve unicità, lascia vuoto o esegui ulteriori regole di business).
+        if (userRepository.existsByNickname(nickname)) {
+            throw new DuplicateNicknameException("Nickname già in uso: " + nickname.getValue());
+        }
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.fujentopj.fujento.module.users.domain.event.DomainEvent;
 import com.fujentopj.fujento.module.users.port.out.DomainEventPublisher;
 import org.springframework.context.ApplicationEventPublisher;
 
+
 import java.util.List;
 
 /**
@@ -28,3 +29,5 @@ public class SpringDomainEventPublisher implements DomainEventPublisher {
         events.forEach(this::publish);
     }
 }
+
+

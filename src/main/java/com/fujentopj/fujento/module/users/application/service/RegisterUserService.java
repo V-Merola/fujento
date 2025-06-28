@@ -21,6 +21,7 @@ public class RegisterUserService implements RegisterUserUseCase {
    private final DomainEventPublisher eventPublisher;
    private final PasswordHasherPort passwordHasher;
 
+
     public RegisterUserService(UserRepository userRepository, UserValidator userValidator, DomainEventPublisher eventPublisher, PasswordHasherPort passwordHasher) {
         this.userRepository = userRepository;
         this.userValidator = userValidator;
@@ -29,7 +30,10 @@ public class RegisterUserService implements RegisterUserUseCase {
     }
     @Override
     public User register(RegisterUserCommand command) {
+
+        //if (!userValidator.validateEmail(command.email())){return null;}
         userValidator.validateEmail(command.email());
+
         userValidator.validateNickname(command.nickname());
 
         var hashedPassword = passwordHasher.hash(command.rawPassword());
@@ -42,10 +46,13 @@ public class RegisterUserService implements RegisterUserUseCase {
                 Role.USER
         );
         userRepository.save(user);
-//        eventPublisher.publishAll(
-//                saved.getDomainEvents()  // Assuming pullDomainEvents returns a collection of events
-//        );
-//        saved.clearDomainEvents(); // Clear events after publishing
+        eventPublisher.publishAll(
+                user.getDomainEvents()  // Assuming pullDomainEvents returns a collection of events
+        );
+
+
+        user.clearDomainEvents(); // Clear events after publishing
         return user;
     }
+
 }

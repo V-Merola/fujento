@@ -31,12 +31,13 @@ public class JpaUserRepository implements UserRepository {
 
     @Override
     public boolean existsByNickname(Nickname nickname) {
-        return false;
+        return springRepo.findByNickname(nickname.getValue()).isPresent();
     }
 
     @Override
     public boolean existsByEmail(Email email) {
-        return false;
+
+        return springRepo.findByEmail(email.getValue()).isPresent();
     }
 
     @Override

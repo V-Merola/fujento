@@ -74,6 +74,7 @@ public class User {
         //Registra l'evento di registrazione dell'utente
         // L'evento contiene lo snapshot dell'utente al momento della registrazione
         user.registerEvent(new UserRegistered(
+                "UserRegistered",
                 user.toSnapshot(),
                 Instant.now()
         ));
@@ -134,7 +135,7 @@ public class User {
         );
     }
 
-
+        // NOTA: la validazione è interesse del DOminio? se no, spostarla a livello superiore
     public void changeNickname(Nickname newNickname, UserValidator validator) {
         validator.validateNickname(newNickname);
 
