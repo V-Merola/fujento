@@ -1,5 +1,6 @@
 package com.fujentopj.fujento.module.users.domain.event;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;
 
 import java.time.Instant;
@@ -15,6 +16,11 @@ import java.util.Optional;
 * sistema (es. Kafka, WebSocket), potresti aggiungere occurredOn,
 * correlationId o metadati aggiuntivi, ma attualmente non è necessario.
 */
+@JsonTypeInfo(
+        use = JsonTypeInfo.Id.NAME,      // Usa il nome della classe
+        include = JsonTypeInfo.As.PROPERTY,
+        property = "TYPE_EVENT"                // ← campo aggiunto nel JSON
+)
 public interface DomainEvent {
     UserId aggregateId();
 

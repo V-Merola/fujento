@@ -1,30 +1,48 @@
 package com.fujentopj.fujento.module.users.domain.event;
 
+import com.fujentopj.fujento.module.users.domain.event.marker.ModifiedByAware;
+import com.fujentopj.fujento.module.users.domain.event.marker.ReasonAware;
 import com.fujentopj.fujento.module.users.domain.model.snapshot.UserSnapshot;
-import com.fujentopj.fujento.module.users.domain.model.valueObject.Email;
-import com.fujentopj.fujento.module.users.domain.model.valueObject.Nickname;
 import com.fujentopj.fujento.module.users.domain.model.valueObject.UserId;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
-
-import static com.nimbusds.openid.connect.sdk.claims.LogoutTokenClaimsSet.EVENT_TYPE;
 
 /**
  * Evento di dominio emesso quando un utente viene registrato.
  */
 public record UserRegistered(
-        String EVENT_TYPE ,
+        String EVENT_TYPE,
         UserSnapshot snapshot,
-        Instant occurredAt
+        Instant occurredAt,
+        UserId createdBy,
+        Optional<String> reason
 
-        ) implements DomainEvent{
-    public static UserRegistered of(UserSnapshot snapshot) {
+        ) implements DomainEvent, ModifiedByAware, ReasonAware {
+
+    static String eventType = "UserRegistered";
+
+    public static UserRegistered of(UserSnapshot snapshot ,UserId modifiedBy, String reason) {
+        Objects.requireNonNull(snapshot.id(), "userId non può essere null");
+        Objects.requireNonNull(modifiedBy, "modifiedBy non può essere null");
+
 
         return new UserRegistered(
-                "",
+                eventType,
                 snapshot,
-                Instant.now()
+                Instant.now(),
+                modifiedBy,
+                Optional.ofNullable(reason)
+        );
+    }
+    public static UserRegistered of(UserSnapshot snapshot, UserId createdBy) {
+        return new UserRegistered(
+                eventType,
+                snapshot,
+                Instant.now(),
+                createdBy,
+                Optional.of("Utente registrato con successo") // ✅ qui il messaggio di default
         );
     }
     @Override
@@ -35,5 +53,10 @@ public record UserRegistered(
     @Override
     public Instant occurredAt() {
         return occurredAt;
+    }
+
+    @Override
+    public UserId modifiedBy() {
+        return createdBy;
     }
 }

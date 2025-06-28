@@ -42,7 +42,6 @@ public class User {
     private Role role;
     private UserStatus status;
 
-
     private final List<DomainEvent> domainEvents = new ArrayList<>();
 
     private boolean dirty = false;
@@ -73,11 +72,19 @@ public class User {
 
         //Registra l'evento di registrazione dell'utente
         // L'evento contiene lo snapshot dell'utente al momento della registrazione
-        user.registerEvent(new UserRegistered(
-                "UserRegistered",
-                user.toSnapshot(),
-                Instant.now()
-        ));
+//        user.registerEvent(new UserRegistered(
+//                user.toSnapshot(),
+//                Instant.now(),
+//                id,
+//                Optional.of("Utente registrato")
+//        ));
+
+        user.registerEvent(
+                UserRegistered.of(
+                        user.toSnapshot(),
+                        id
+                )
+        );
         return user;
     }
 

@@ -30,7 +30,6 @@ public class RegisterUserService implements RegisterUserUseCase {
     }
     @Override
     public User register(RegisterUserCommand command) {
-
         //if (!userValidator.validateEmail(command.email())){return null;}
         userValidator.validateEmail(command.email());
 
