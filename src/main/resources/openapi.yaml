@@ -1,0 +1,308 @@
+openapi: 3.0.0
+info:
+  title: Fujento API
+  description: API per il sistema Fujento - Gestione utenti con architettura esagonale e DDD
+  version: 1.0.0
+  contact:
+    name: Fujento Team
+    email: support@fujento.com
+
+servers:
+  - url: http://localhost:8080
+    description: Server di sviluppo locale
+
+paths:
+  # === USER ENDPOINTS ===
+  /api/v1/users/register:
+    post:
+      tags:
+        - Users
+      summary: Registra un nuovo utente
+      description: Crea un nuovo utente nel sistema con email, nickname e password
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterUserRequestDTO'
+            example:
+              email: "user@example.com"
+              nickname: "johndoe"
+              password: "securePassword123"
+      responses:
+        '201':
+          description: Utente registrato con successo
+          headers:
+            Location:
+              description: URL dell'utente creato
+              schema:
+                type: string
+        '400':
+          description: Dati di input non validi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email o nickname già esistenti
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Errore interno del server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # === DEVELOPMENT/MONITORING ENDPOINTS ===
+  /api/dev/events:
+    get:
+      tags:
+        - Development
+      summary: Recupera tutti gli eventi di dominio
+      description: Endpoint per sviluppo - recupera tutti gli eventi di dominio memorizzati
+      operationId: getAllDomainEvents
+      responses:
+        '200':
+          description: Lista di eventi di dominio
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DomainEvent'
+              example:
+                - TYPE_EVENT: "UserRegistered"
+                  aggregateId: "123e4567-e89b-12d3-a456-426614174000"
+                  occurredAt: "2024-01-15T10:30:00Z"
+                  snapshot:
+                    id: "123e4567-e89b-12d3-a456-426614174000"
+                    email: "user@example.com"
+                    nickname: "johndoe"
+                    role: "USER"
+                    status: "ACTIVE"
+    delete:
+      tags:
+        - Development
+      summary: Cancella tutti gli eventi
+      description: Endpoint per sviluppo - rimuove tutti gli eventi di dominio memorizzati
+      operationId: clearAllEvents
+      responses:
+        '204':
+          description: Eventi cancellati con successo
+
+components:
+  schemas:
+    # === REQUEST DTOs ===
+    RegisterUserRequestDTO:
+      type: object
+      required:
+        - email
+        - nickname
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email dell'utente (deve essere unica)
+          example: "user@example.com"
+          pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        nickname:
+          type: string
+          description: Nickname dell'utente (deve essere unico)
+          example: "johndoe"
+          minLength: 3
+          maxLength: 50
+          pattern: "^[a-zA-Z0-9_-]+$"
+        password:
+          type: string
+          description: Password dell'utente
+          example: "securePassword123"
+          minLength: 8
+          maxLength: 100
+
+    # === DOMAIN EVENTS ===
+    DomainEvent:
+      type: object
+      discriminator:
+        propertyName: TYPE_EVENT
+        mapping:
+          UserRegistered: '#/components/schemas/UserRegistered'
+      required:
+        - TYPE_EVENT
+        - aggregateId
+        - occurredAt
+      properties:
+        TYPE_EVENT:
+          type: string
+          description: Tipo di evento di dominio
+          example: "UserRegistered"
+        aggregateId:
+          type: string
+          format: uuid
+          description: ID dell'aggregato che ha generato l'evento
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        occurredAt:
+          type: string
+          format: date-time
+          description: Timestamp di quando è avvenuto l'evento
+          example: "2024-01-15T10:30:00Z"
+        correlationId:
+          type: string
+          description: ID di correlazione per tracciare operazioni correlate
+          example: "corr-123456"
+        traceId:
+          type: string
+          description: ID di tracciamento per debugging distribuito
+          example: "trace-789012"
+        version:
+          type: integer
+          description: Versione dell'evento
+          example: 1
+          default: 1
+
+    UserRegistered:
+      allOf:
+        - $ref: '#/components/schemas/DomainEvent'
+        - type: object
+          required:
+            - snapshot
+            - createdBy
+          properties:
+            EVENT_TYPE:
+              type: string
+              enum: ["UserRegistered"]
+              example: "UserRegistered"
+            snapshot:
+              $ref: '#/components/schemas/UserSnapshot'
+            createdBy:
+              type: string
+              format: uuid
+              description: ID dell'utente che ha creato questo utente
+              example: "123e4567-e89b-12d3-a456-426614174000"
+            reason:
+              type: string
+              description: Motivo della registrazione
+              example: "Utente registrato con successo"
+
+    # === DOMAIN MODELS ===
+    UserSnapshot:
+      type: object
+      required:
+        - id
+        - email
+        - nickname
+        - role
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID univoco dell'utente
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        email:
+          type: string
+          format: email
+          description: Email dell'utente
+          example: "user@example.com"
+        nickname:
+          type: string
+          description: Nickname dell'utente
+          example: "johndoe"
+        role:
+          $ref: '#/components/schemas/Role'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+
+    # === VALUE OBJECTS ===
+    UserId:
+      type: string
+      format: uuid
+      description: Identificatore univoco dell'utente
+      example: "123e4567-e89b-12d3-a456-426614174000"
+
+    Email:
+      type: string
+      format: email
+      description: Indirizzo email valido
+      example: "user@example.com"
+      pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+
+    Nickname:
+      type: string
+      description: Nickname dell'utente
+      example: "johndoe"
+      minLength: 3
+      maxLength: 50
+      pattern: "^[a-zA-Z0-9_-]+$"
+
+    # === ENUMS ===
+    Role:
+      type: string
+      enum:
+        - ADMIN
+        - USER
+      description: Ruolo dell'utente nel sistema
+      example: "USER"
+
+    UserStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - DISABLED
+        - BANNED
+        - ARCHIVED
+        - DELETED
+      description: |
+        Status dell'utente:
+        - ACTIVE: Profilo attivo e funzionante
+        - DISABLED: Profilo disattivato, ma non cancellato
+        - BANNED: Profilo bannato per violazione del sistema
+        - ARCHIVED: Profilo archiviato, non può più accedere
+        - DELETED: Profilo cancellato, non può più accedere
+      example: "ACTIVE"
+
+    # === ERROR RESPONSES ===
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - timestamp
+      properties:
+        error:
+          type: string
+          description: Codice di errore
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Messaggio di errore leggibile
+          example: "Email già esistente nel sistema"
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp dell'errore
+          example: "2024-01-15T10:30:00Z"
+        details:
+          type: array
+          items:
+            type: string
+          description: Dettagli aggiuntivi sull'errore
+          example: ["Il campo email deve essere unico"]
+        path:
+          type: string
+          description: Path dell'endpoint che ha generato l'errore
+          example: "/api/v1/users/register"
+
+tags:
+  - name: Users
+    description: Operazioni relative alla gestione degli utenti
+  - name: Development
+    description: Endpoint per sviluppo e monitoraggio (solo ambiente dev)
+
+# === SECURITY (per future implementazioni) ===
+security:
+  - BearerAuth: []

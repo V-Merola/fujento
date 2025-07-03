@@ -31,4 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
 sonar-project.properties
+Documentazione_completa_del_pr.md
+.junie
+docs

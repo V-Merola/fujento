@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/dev/events")
+@RequestMapping("api/dev/events")
 public class EventRestController {
 
     private final InMemoryEventStore store;
